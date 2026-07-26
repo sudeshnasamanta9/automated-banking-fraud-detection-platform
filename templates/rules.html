@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page-specific styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/rules.css') }}">
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="alert-banner">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div id="db-rules-payload" data-json='{{ rules_json | safe }}' style="display: none;"></div>
+
+    <div class="workspace">
+        <div class="sidebar-rules">
+            <h3>Txn Monitoring Registry</h3>
+            
+          {% if rules_json %}
+    {% set rules_data = rules_json | from_json_filter_or_similar_if_any %}
+    {% for rule_id, entry in rules_data.items() %}
+        <div class="rule-card" onclick="bindSelectedRule('{{ rule_id }}', event)">
+           <strong id="card_label_{{ rule_id }}">{{ entry.name }}</strong>
+            <span id="card_span_{{ rule_id }}">{{ entry.data.description or '(No Description)' }}</span>
+        </div>
+    {% endfor %}
+{% endif %}
+            
+            <button class="btn btn-success" onclick="initializeFreshRuleForm()">+ Create New Rule</button>
+        </div>
+
+        <div class="form-pane">
+            <div class="pane-title">Edit Execution Parameters Matrix</div>
+            
+            <form action="/save-rule" method="POST">
+                <div class="meta-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" name="category" value="Txn Monitoring">
+                    </div>
+                    <div class="form-group">
+                        <label>Rule Name</label>
+                        <input type="text" id="rule_name" name="rule_name" value="" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="description" name="description" value="">
+                    </div>
+                    <div class="form-group">
+                        <label>Risk Score</label>
+                        <select name="score">
+                            <option value="VERYLOW">VERY LOW</option>
+                            <option value="LOW">LOW</option>
+                            <option value="MEDIUM" selected>MEDIUM</option>
+                            <option value="HIGH">HIGH</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rule ID</label>
+                        <input type="text" id="rule_id" name="rule_id" value="" readonly>
+                    </div>
+                </div>
+
+                <div class="matrix-header">
+                    <div>Transaction Field</div>
+                    <div>Operator</div>
+                    <div>Input Box (INR / Values)</div>
+                    <div>Logical And</div>
+                </div>
+
+                <div id="matrix-container"></div>
+
+                <div style="margin-top: 15px; text-align: right;">
+                    <span onclick="addNewFieldRow()" style="color: #38bdf8; font-size: 13px; cursor: pointer; text-decoration: underline; font-weight: 500; padding-right: 5px;">
+                        + Add Dynamic Parameter Field
+                    </span>
+                </div>
+
+                <div style="margin-top: 25px; display: flex; justify-content: space-between;">
+                    <button type="button" class="btn" style="background-color: #ef4444;" onclick="triggerRuleDeletion()">
+                        🗑️ Delete This Rule
+                    </button>
+                    <button type="submit" class="btn">Save & Export Config Structure (JSON)</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/rules.js') }}"></script>
+{% endblock %}

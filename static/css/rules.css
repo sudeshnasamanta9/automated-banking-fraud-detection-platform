@@ -1,0 +1,61 @@
+/* Core Workspace Panels */
+.workspace { display: flex; gap: 20px;
+    width: 100%; 
+    padding: 0;
+    box-sizing: border-box; }
+
+/* Left Side Rules Index List */
+.sidebar-rules { width: 25%; background-color: #111827; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; }
+.sidebar-rules h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #1e293b; color: #9ca3af; font-size: 14px; text-transform: uppercase; }
+.rule-card { padding: 12px; background-color: #1f2937; border: 1px solid #374151; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s ease-in-out; /* Adding ease-in-out makes the green bar appear smoothly */
+    border-left: 4px solid transparent; /* Ensure the default state has a transparent border */ }
+.rule-card:hover { border-color: #2563eb; background-color: #111827; }
+.rule-card.active-card { border-left: 4px solid #10b981; border-color: #10b981; background-color: #16222f; }
+.rule-card strong { 
+    display: block; 
+    color: #ffffff; 
+    font-size: 14px; 
+    white-space: normal; /* allow wrap */
+    overflow: visible; /* don't hide */
+    text-overflow: unset; /* remove... */
+    word-break: break-word; /* break long words */
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+.rule-card span {
+    color: #9ca3af !important;
+    font-size: 12px !important;
+    display: block !important;          
+    white-space: normal !important;     /* Force multi-line wrapping */
+    overflow: visible !important;       /* Stop hiding the text */
+    text-overflow: clip !important;     /* Remove the ... */
+    line-height: 1.4 !important;
+    word-break: break-word !important;  /* Ensure long words wrap */
+}
+
+/* Right Side Parameters Matrix Panel */
+.form-pane { width: 75%; background-color: #111827; border: 1px solid #1e293b; padding: 20px; border-radius: 8px; }
+.pane-title { margin-top: 0; margin-bottom: 20px; font-size: 18px; color: #ffffff; border-bottom: 1px solid #1e293b; padding-bottom: 10px; }
+
+/* Form Row Grouping Flex Layout blocks */
+.meta-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 25px; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; letter-spacing: 0.5px; }
+
+input, select, textarea { background-color: #1f2937; color: #ffffff; border: 1px solid #374151; padding: 10px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
+input:focus, select:focus, textarea:focus { border-color: #2563eb; outline: none; }
+input[readonly] { background-color: #0b0f19; color: #9ca3af; cursor: not-allowed; }
+
+/* Condition Table Blocks matching original production design */
+.matrix-header { display: grid; grid-template-columns: 2.5fr 1.5fr 2fr 1fr; gap: 12px; padding: 8px 0; color: #9ca3af; font-size: 12px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #1e293b; margin-bottom: 12px; }
+.condition-row { display: grid; grid-template-columns: 2.5fr 1.5fr 2fr 1fr; gap: 12px; margin-bottom: 12px; align-items: center; }
+.input-container { width: 100%; }
+
+/* Notification Messages */
+.alert-banner { padding: 12px; background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; border-radius: 6px; margin-bottom: 20px; font-weight: 500; text-align: center; }
+
+/* Action Buttons */
+.btn { background-color: #2563eb; color: white; border: none; padding: 12px 20px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 14px; }
+.btn:hover { background-color: #1d4ed8; }
+.btn-success { background-color: #10b981; width: 100%; margin-top: 15px; }
+.btn-success:hover { background-color: #059669; }

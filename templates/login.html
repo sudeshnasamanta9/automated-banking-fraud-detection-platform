@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Gateway</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <h2>Login Page</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="status-msg {{ category }}">
+              {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required autocomplete="off">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+            
+            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="show-pass" onclick="togglePass()" style="width: auto; cursor: pointer;">
+                <label for="show-pass" style="margin-bottom: 0; cursor: pointer; display: inline; font-size: 0.85rem; color: var(--text-muted);">Show Password</label>
+            </div>
+
+            <div id="password-policy-box" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px;">
+                <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.4rem;">Password Requirements:</div>
+                <ul style="list-style: none; padding-left: 0; font-size: 0.75rem; line-height: 1.5;">
+                    <li id="rule-length" style="color: var(--failure);">❌ 4 to 12 characters</li>
+                    <li id="rule-upper" style="color: var(--failure);">❌ At least 1 uppercase letter</li>
+                    <li id="rule-special" style="color: var(--failure);">❌ At least 1 special character</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button type="submit" name="action" value="login">Log In</button>
+            <button type="submit" name="action" value="register">Sign Up</button>
+        </div>
+    </form>
+
+    <div class="links">
+        <a href="/forgot-password">Forgot password?</a>
+    </div>
+</div>
+
+<script>
+// Traditional check box toggle
+function togglePass() {
+    var x = document.getElementById("password");
+    x.type = (x.type === "password") ? "text" : "password";
+}
+
+const passwordInput = document.getElementById('password');
+const policyBox = document.getElementById('password-policy-box');
+
+const ruleLength = document.getElementById('rule-length');
+const ruleUpper = document.getElementById('rule-upper');
+const ruleSpecial = document.getElementById('rule-special');
+
+// Condition: Show policy box only when user focuses/clicks on the input field
+passwordInput.addEventListener('focus', () => {
+    policyBox.style.display = 'block';
+});
+
+// Condition: Evaluate password rules in real-time as the user types
+passwordInput.addEventListener('input', () => {
+    const val = passwordInput.value;
+
+    // 1. Check length rule
+    if (val.length >= 4 && val.length <= 12) {
+        ruleLength.innerHTML = "✔ 4 to 12 characters";
+        ruleLength.style.color = "var(--success)";
+    } else {
+        ruleLength.innerHTML = "❌ 4 to 12 characters";
+        ruleLength.style.color = "var(--failure)";
+    }
+
+    // 2. Check uppercase rule
+    if (/[A-Z]/.test(val)) {
+        ruleUpper.innerHTML = "✔ At least 1 uppercase letter";
+        ruleUpper.style.color = "var(--success)";
+    } else {
+        ruleUpper.innerHTML = "❌ At least 1 uppercase letter";
+        ruleUpper.style.color = "var(--failure)";
+    }
+
+    // 3. Check special character rule
+    if (/[!@#$%^&*(),.?":{}|<>_+-]/.test(val)) {
+        ruleSpecial.innerHTML = "✔ At least 1 special character";
+        ruleSpecial.style.color = "var(--success)";
+    } else {
+        ruleSpecial.innerHTML = "❌ At least 1 special character";
+        ruleSpecial.style.color = "var(--failure)";
+    }
+});
+</script>
+
+</body>
+</html>
