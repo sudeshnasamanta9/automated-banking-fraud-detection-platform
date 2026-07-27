@@ -6,8 +6,11 @@ import mysql.connector
 import json
 from datetime import datetime
 import pandas as pd
+import plotly.express as px
+import plotly.io as pio
 import numpy as np
 import kagglehub
+from sqlalchemy import create_engine
 from flask import Flask, render_template, request, redirect, flash, session, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -101,12 +104,105 @@ def logout():
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login')) # Redirects to your login page
 
+import io
+import base64
+import matplotlib
+matplotlib.use('Agg') # Necessary for non-GUI backend in Flask
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 @app.route('/dashboard')
 def dashboard():
     if 'user' not in session:
         flash("Please log in first.", "failure")
         return redirect(url_for('login'))
-    return render_template('dashboard.html')
+
+    try:
+        engine = create_engine(f"mysql+mysqlconnector://root:{os.getenv('DB_PASSWORD')}@localhost:3306/kedge_db")
+
+        # Set clean aesthetic style for Matplotlib
+        sns.set_theme(style="whitegrid")
+        palette = sns.color_palette("muted")
+
+        # 1. Query Daily Bar Chart Data
+        bar_query = """
+            SELECT 
+                DATE(alert_timestamp) AS alert_date,
+                rule_name,
+                COUNT(*) AS alert_count
+            FROM alert_details
+            WHERE alert_timestamp >= NOW() - INTERVAL 7 DAY
+            GROUP BY DATE(alert_timestamp), rule_name
+            ORDER BY alert_date ASC
+        """
+        df_bar = pd.read_sql(bar_query, con=engine)
+
+        # Generate Bar Chart Image in Memory
+        fig, ax = plt.subplots(figsize=(7, 4))
+        if not df_bar.empty:
+            df_bar['alert_date'] = pd.to_datetime(df_bar['alert_date'])
+            full_date_range = pd.date_range(end=datetime.now().date(), periods=7)
+            df_pivot = df_bar.pivot_table(index='alert_date', columns='rule_name', values='alert_count', fill_value=0)
+            df_pivot = df_pivot.reindex(full_date_range, fill_value=0).reset_index()
+            df_melted = df_pivot.melt(id_vars='index', var_name='rule_name', value_name='alert_count')
+            df_melted.rename(columns={'index': 'alert_date'}, inplace=True)
+            df_melted['alert_date'] = df_melted['alert_date'].dt.strftime('%m-%d')
+
+            sns.barplot(data=df_melted, x='alert_date', y='alert_count', hue='rule_name', palette=palette, ax=ax)
+            ax.set_title('Daily Alert Distribution (Last 7 Days)', fontsize=12, fontweight='bold', pad=15)
+            ax.set_xlabel('Date', fontsize=10)
+            ax.set_ylabel('Alert Count', fontsize=10)
+            ax.legend(title='Rule Name', bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+        else:
+            ax.text(0.5, 0.5, 'No alert data available', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        
+        plt.tight_layout()
+        img_bar = io.BytesIO()
+        plt.savefig(img_bar, format='png', bbox_inches='tight', dpi=100)
+        img_bar.seek(0)
+        bar_url = base64.b64encode(img_bar.getvalue()).decode('utf8')
+        plt.close(fig)
+
+        # 2. Query Donut Chart Data
+        donut_query = """
+            SELECT 
+                rule_name,
+                COUNT(*) AS alert_count
+            FROM alert_details
+            WHERE alert_timestamp >= NOW() - INTERVAL 7 DAY
+            GROUP BY rule_name
+        """
+        df_donut = pd.read_sql(donut_query, con=engine)
+
+        # Generate Donut Chart Image in Memory
+        fig, ax = plt.subplots(figsize=(5, 4))
+        if not df_donut.empty:
+            wedges, texts, autotexts = ax.pie(
+                df_donut['alert_count'], 
+                labels=df_donut['rule_name'], 
+                autopct='%1.1f%%', 
+                startangle=140, 
+                colors=palette,
+                wedgeprops=dict(width=0.4, edgecolor='w') # Creates the Donut hole
+            )
+            plt.setp(autotexts, size=8, weight="bold")
+            plt.setp(texts, size=8)
+            ax.set_title('1-Week Alert Proportion', fontsize=12, fontweight='bold', pad=15)
+        else:
+            ax.text(0.5, 0.5, 'No alerts recorded', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
+        plt.tight_layout()
+        img_donut = io.BytesIO()
+        plt.savefig(img_donut, format='png', bbox_inches='tight', dpi=100)
+        img_donut.seek(0)
+        donut_url = base64.b64encode(img_donut.getvalue()).decode('utf8')
+        plt.close(fig)
+
+    except Exception as e:
+        bar_url = None
+        donut_url = None
+
+    return render_template('dashboard.html', bar_url=bar_url, donut_url=donut_url)
 
 @app.route('/configuration')
 def configuration():
