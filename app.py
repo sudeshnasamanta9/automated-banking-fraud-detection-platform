@@ -85,12 +85,14 @@ def login():
                 conn.close()
 
         elif action == 'login':
-            cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
+            # Select both user_id and password
+            cursor.execute("SELECT user_id, password FROM users WHERE username = %s", (username,))
             row = cursor.fetchone()
             conn.close()
 
-            if row and check_password_hash(row[0], password):
+            if row and check_password_hash(row[1], password):
                 session['user'] = username
+                session['user_id'] = row[0]  # Store user_id in session
                 return redirect(url_for('dashboard'))
             else:
                 flash("Invalid username or password.", "failure")
@@ -208,7 +210,49 @@ def dashboard():
 def configuration():
     if 'user' not in session:
         return redirect(url_for('login'))
-    return render_template('config.html')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    total_records = 0
+    last_run_time = "Never"
+    
+    try:
+        # Get total data count from transaction_details table
+        cursor.execute("SELECT COUNT(*) AS total FROM transaction_details")
+        res_count = cursor.fetchone()
+        if res_count:
+            total_records = res_count['total']
+            
+        # Get the latest execution timestamp when the rule engine worked
+        cursor.execute("SELECT MAX(alert_timestamp) AS last_run FROM alert_details")
+        res_run = cursor.fetchone()
+        if res_run and res_run['last_run']:
+            last_run_time = str(res_run['last_run'])
+            
+    except Exception as e:
+        print(f"Error fetching telemetry metrics: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return render_template('config.html', total_records=total_records, last_run_time=last_run_time)
+
+@app.route('/check-engine-status')
+def check_engine_status():
+    if 'user' not in session:
+        return {'status': 'unauthorized'}
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT status FROM system_settings WHERE setting_name = 'rule_engine'")
+    res = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
+    if res and res['status'] == 'COMPLETED':
+        return {'completed': True, 'message': 'All transactions processed. Rule Engine completed. Stopping scheduler as all data is processed.'}
+    return {'completed': False}
 
 # --- LIVE AUTOMATED KAGGLE DATA PULLING PIPELINE ROUTE ---
 # ===== 1. ONLY CHANGE THIS BLOCK FOR NEW DATASET =====
@@ -379,11 +423,54 @@ def toggle_rules():
     session['rule_engine'] = is_on
     flash(f"Rule Engine has been set to {new_status}.", "success")
     return render_template('config.html')
-@app.route('/report')
+@app.route('/report', methods=['GET', 'POST'])
 def report():
     if 'user' not in session:
         return redirect(url_for('login'))
-    return render_template('report.html')
+    
+    tab = request.args.get('tab', 'summary') # Default to alert summary tab
+    engine = create_engine(f"mysql+mysqlconnector://root:{os.getenv('DB_PASSWORD')}@localhost:3306/kedge_db")
+    
+    summary_data = []
+    full_alerts = []
+    from_date = request.form.get('from_date', '')
+    to_date = request.form.get('to_date', '')
+
+    try:
+        if tab == 'summary':
+            if request.method == 'POST' and from_date and to_date:
+                summary_query = """
+                    SELECT rule_name, COUNT(*) AS trigger_count
+                    FROM alert_details
+                    WHERE DATE(alert_timestamp) BETWEEN %s AND %s
+                    GROUP BY rule_name
+                """
+                summary_df = pd.read_sql(summary_query, con=engine, params=(from_date, to_date))
+            else:
+                # Default view showing all-time summary or recent summary if no dates chosen
+                summary_query = """
+                    SELECT rule_name, COUNT(*) AS trigger_count
+                    FROM alert_details
+                    GROUP BY rule_name
+                """
+                summary_df = pd.read_sql(summary_query, con=engine)
+            
+            summary_data = summary_df.to_dict(orient='records')
+
+        elif tab == 'full':
+            full_query = "SELECT * FROM alert_details ORDER BY alert_timestamp DESC"
+            full_df = pd.read_sql(full_query, con=engine)
+            full_alerts = full_df.to_dict(orient='records')
+
+    except Exception as e:
+        flash(f"Error loading report data: {e}", "failure")
+
+    return render_template('report.html', 
+                           active_tab=tab, 
+                           summary_data=summary_data, 
+                           full_alerts=full_alerts,
+                           from_date=from_date,
+                           to_date=to_date)
 
 @app.route('/forgot-password')
 def forgot_password():

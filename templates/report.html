@@ -1,12 +1,112 @@
 {% extends "base.html" %}
+
 {% block content %}
-<div class="container">
-    <h2>Fraud Detection Reports</h2>
-    <p>View and download detailed logs of all flagged transactions and triggered rules.</p>
-    
-    <!-- Add your report tables, charts, or export buttons here -->
-    <div class="card">
-        <p>Report generation and export features coming soon.</p>
+<!-- Link your classy separate CSS file -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+
+<div class="report-container">
+    <h1 class="report-title">Fraud Detection Reports</h1>
+    <p class="report-subtitle">View rule execution statistics, summary trends, and granular audit logs.</p>
+
+    <div class="report-layout">
+        <!-- Sidebar Navigation with SVG Vector Icons -->
+        <div class="report-sidebar">
+            <a href="{{ url_for('report', tab='summary') }}" class="nav-tab {% if active_tab == 'summary' %}active{% endif %}">
+                <!-- Bar Chart Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 131.5-1.5M12 3v18m-9-6h18m-9 6v-9" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Alert Summary
+            </a>
+
+            <a href="{{ url_for('report', tab='full') }}" class="nav-tab {% if active_tab == 'full' %}active{% endif %}">
+                <!-- Table / Document Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Alert Report
+            </a>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="report-card">
+            
+            {% if active_tab == 'summary' %}
+                <h3 class="card-title">Rule Trigger Summary</h3>
+                
+                <!-- Date Filter Section -->
+                <form method="POST" class="filter-form">
+                    <div class="form-group">
+                        <label>From Date</label>
+                        <input type="date" name="from_date" value="{{ from_date }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>To Date</label>
+                        <input type="date" name="to_date" value="{{ to_date }}" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Filter Results</button>
+                </form>
+
+                <!-- Summary Data Table -->
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Rule Name</th>
+                            <th>Total Times Triggered</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if summary_data %}
+                            {% for row in summary_data %}
+                            <tr>
+                                <td style="font-weight: 500;">{{ row.rule_name }}</td>
+                                <td>{{ row.trigger_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="2" class="empty-state">No summary records found for the selected date range.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+            {% elif active_tab == 'full' %}
+                <h3 class="card-title">Full Alert Log Report</h3>
+                
+                <!-- Detailed Table View -->
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Alert ID</th>
+                                <th>Account Number (ACN)</th>
+                                <th>Triggered Rule</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if full_alerts %}
+                                {% for alert in full_alerts %}
+                                <tr>
+                                    <td>{{ alert.alert_id }}</td>
+                                    <td>{{ alert.acn }}</td>
+                                    <td style="font-weight: 500;">{{ alert.rule_name }}</td>
+                                    <td>{{ alert.alert_timestamp }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="empty-state">No alerts recorded in system log.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+        </div>
     </div>
 </div>
 {% endblock %}

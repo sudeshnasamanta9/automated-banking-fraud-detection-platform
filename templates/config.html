@@ -8,8 +8,9 @@
     
     .left-panel { flex: 1; background: #151c2c; border: 1px solid #24304f; padding: 30px; border-radius: 10px; }
     .policy-title { font-size: 16px; font-weight: 700; color: #60a5fa; margin-top: 0; margin-bottom: 20px; text-transform: uppercase; }
-    .policy-list { list-style: none; padding: 0; margin: 0; }
-    .policy-list li { padding: 18px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 14px; }
+    .telemetry-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+    .telemetry-item { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 14px; color: #94a3b8; }
+    .telemetry-value { color: #f8fafc; font-weight: 600; font-family: monospace; }
 
     .right-panel { flex: 1.5; display: flex; flex-direction: column; gap: 20px; }
     .toggle-group { display: flex; justify-content: space-between; align-items: center; 
@@ -38,19 +39,27 @@
 
     <div class="flex-container">
         <section class="left-panel">
-            <div class="policy-title">password_policy</div>
-            <ul class="policy-list">
-                <li>• 4 to 12 Characters Alpha-Numeric</li>
-                <li>• Minimum 1 Uppercase Letter Enforced</li>
-                <li>• Minimum 1 Special Character</li>
-                <li style="border: none; color: #10b981; font-weight: 700; padding-top: 15px;">✓ Rules Status: Active</li>
+            <div class="policy-title">Engine Telemetry</div>
+            <ul class="telemetry-list">
+                <li class="telemetry-item">
+                    <span>Total Data Records:</span>
+                    <span class="telemetry-value" style="color: #38bdf8;">{{ total_records }}</span>
+                </li>
+                <li class="telemetry-item">
+                    <span>Last Rule Execution Done:</span>
+                    <span class="telemetry-value" style="color: #34d399;">{{ last_run_time }}</span>
+                </li>
+                <li style="border: none; display: flex; align-items: center; gap: 8px; padding-top: 5px;">
+                    <span style="height: 8px; width: 8px; background-color: #10b981; border-radius: 50%; display: inline-block;"></span>
+                    <span style="color: #10b981; font-weight: 700; font-size: 13px;">Engine Status: Operational</span>
+                </li>
             </ul>
         </section>
 
         <section class="right-panel">
             <form action="/toggle-data" method="POST" id="dataForm">
                 <div class="toggle-group">
-                    <span class="toggle-label">Data Pulling</span>
+                    <span class="toggle-label" style="color: #f8fafc; font-weight: 500;">Data Pulling</span>
                     <label class="switch">
                         <input type="checkbox" name="data_pull" onchange="document.getElementById('dataForm').submit();" {% if session.get('data_pulling') %}checked{% endif %}>
                         <span class="slider"></span>
@@ -60,7 +69,7 @@
 
             <form action="/toggle-rules" method="POST" id="rulesForm">
                 <div class="toggle-group">
-                    <span class="toggle-label">Rule Engine</span>
+                    <span class="toggle-label" style="color: #f8fafc; font-weight: 500;">Rule Engine</span>
                     <label class="switch">
                         <input type="checkbox" name="rule_engine" onchange="document.getElementById('rulesForm').submit();" {% if session.get('rule_engine') %}checked{% endif %}>
                         <span class="slider"></span>

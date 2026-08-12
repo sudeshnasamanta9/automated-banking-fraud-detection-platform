@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENGINE_CORE</title>
+    <title>Detecta</title>
     
     <!-- Load Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -14,7 +14,7 @@
 <body>
 
     <nav class="sidebar">
-        <div class="logo">ENGINE_CORE</div>
+        <div class="logo">Detecta</div>
         
         <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">
             <i data-lucide="layout-dashboard"></i> Dashboard
@@ -41,7 +41,31 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Initialize icons -->
-    <script>lucide.createIcons();</script>
+    <script>
+    // Render the Lucide icons on page load
+    lucide.createIcons();
+
+    // Background engine status poller
+    setInterval(async () => {
+        try {
+            let response = await fetch('/check-engine-status');
+            let data = await response.json();
+            if (data.completed) {
+                let existingBanner = document.getElementById('engineNotification');
+                if (existingBanner) {
+                    existingBanner.remove();
+                }
+
+                let banner = document.createElement('div');
+                banner.id = 'engineNotification';
+                banner.style.cssText = "position: fixed; top: 40px; right: 40px; background: #151c2c; color: #34d399; border: 1px solid #10b981; padding: 15px 25px; border-radius: 8px; font-weight: 600; font-size: 14px; z-index: 99999; box-shadow: 0 4px 20px rgba(0,0,0,0.7); font-family: 'Inter', sans-serif;";
+                banner.innerText = data.message;
+                document.body.appendChild(banner);
+            }
+        } catch (e) {
+            console.error("Error checking engine status:", e);
+        }
+    }, 5000);
+</script>
 </body>
 </html>

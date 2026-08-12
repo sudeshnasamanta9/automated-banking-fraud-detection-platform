@@ -138,6 +138,11 @@ def process_batch():
 
     if not transactions:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] All transactions processed. Rule Engine completed.")
+        
+        # ---> UPDATE STATUS TO COMPLETED IN DATABASE <---
+        cursor.execute("UPDATE system_settings SET status = 'COMPLETED' WHERE setting_name = 'rule_engine'")
+        conn.commit()
+        
         cursor.close()
         conn.close()
         return False
