@@ -51,21 +51,20 @@
             let response = await fetch('/check-engine-status');
             let data = await response.json();
             if (data.completed) {
-                let existingBanner = document.getElementById('engineNotification');
-                if (existingBanner) {
-                    existingBanner.remove();
+                let notificationArea = document.querySelector('.notification-area');
+                if (notificationArea && !document.getElementById('engineCompletedAlert')) {
+                    let alertDiv = document.createElement('div');
+                    alertDiv.id = 'engineCompletedAlert';
+                    alertDiv.className = 'flash-messages flash-success';
+                    alertDiv.innerText = data.message;
+                    notificationArea.appendChild(alertDiv);
                 }
-
-                let banner = document.createElement('div');
-                banner.id = 'engineNotification';
-                banner.style.cssText = "position: fixed; top: 40px; right: 40px; background: #151c2c; color: #34d399; border: 1px solid #10b981; padding: 15px 25px; border-radius: 8px; font-weight: 600; font-size: 14px; z-index: 99999; box-shadow: 0 4px 20px rgba(0,0,0,0.7); font-family: 'Inter', sans-serif;";
-                banner.innerText = data.message;
-                document.body.appendChild(banner);
             }
         } catch (e) {
             console.error("Error checking engine status:", e);
         }
     }, 5000);
+   
 </script>
 </body>
 </html>

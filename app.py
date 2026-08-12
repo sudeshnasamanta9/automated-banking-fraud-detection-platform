@@ -382,11 +382,11 @@ def toggle_data():
 
     return render_template('config.html')
 
-from engine import run_rule_engine # Import the new engine
+from rule_engine import run_rule_engine # Import the new engine
 
 import subprocess
 import sys
-# ... your other imports ...
+# ... other imports ...
 
 # Global variable to track the engine process
 engine_process = None
@@ -412,8 +412,8 @@ def toggle_rules():
     if new_status == 'ON':
         # Check if process is already running to avoid duplicates
         if engine_process is None or engine_process.poll() is not None:
-            # Starts engine.py in the background
-            engine_process = subprocess.Popen([sys.executable, "engine.py"])
+            # Starts rule_engine.py in the background
+            engine_process = subprocess.Popen([sys.executable, "rule_engine.py"])
     else:
         # Terminate the process if it exists
         if engine_process is not None:

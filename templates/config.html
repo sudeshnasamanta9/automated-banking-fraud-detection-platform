@@ -4,6 +4,15 @@
 <style>
     /* Add only page-specific styles here, not global navigation styles */
     .workspace-container { max-width: 1400px; margin: 0 auto; }
+    
+    /* Dedicated container to stack messages neatly */
+    .notification-area {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 25px;
+    }
+
     .flex-container { display: flex; gap: 60px; align-items: flex-start; }
     
     .left-panel { flex: 1; background: #151c2c; border: 1px solid #24304f; padding: 30px; border-radius: 10px; }
@@ -23,19 +32,22 @@
     input:checked + .slider { background-color: #3b82f6; }
     input:checked + .slider:before { transform: translateX(30px); }
 
-    .flash-messages { padding: 16px; margin-bottom: 25px; border-radius: 8px; font-weight: 600; text-align: center; }
+    .flash-messages { padding: 16px; border-radius: 8px; font-weight: 600; text-align: center; }
     .flash-success { background-color: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid #10b981; }
     .flash-failure { background-color: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid #ef4444; }
 </style>
 
 <div class="workspace-container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, msg in messages %}
-                <div class="flash-messages flash-{{ category }}">{{ msg }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+    <!-- Notification Area container -->
+    <div class="notification-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <div class="flash-messages flash-{{ category }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
 
     <div class="flex-container">
         <section class="left-panel">
