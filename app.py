@@ -112,6 +112,11 @@ import matplotlib
 matplotlib.use('Agg') # Necessary for non-GUI backend in Flask
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sqlalchemy import create_engine
+import pandas as pd
+from datetime import datetime
+from flask import render_template, session, flash, redirect, url_for
+import os
 
 @app.route('/dashboard')
 def dashboard():
@@ -119,92 +124,167 @@ def dashboard():
         flash("Please log in first.", "failure")
         return redirect(url_for('login'))
 
+    bar_url = donut_url = None
+    total_alerts = flagged_accounts = active_rules = flagged_pct = 0
+    status_text = "Active"
+    status_color = "#10b981"
+    data_gap_warning = None
+
     try:
         engine = create_engine(f"mysql+mysqlconnector://root:{os.getenv('DB_PASSWORD')}@localhost:3306/kedge_db")
-
-        # Set clean aesthetic style for Matplotlib
         sns.set_theme(style="whitegrid")
-        palette = sns.color_palette("muted")
 
-        # 1. Query Daily Bar Chart Data
+        color_map = {
+            'GST Refund': '#3b82f6',
+            'High value credit in new account': '#f59e0b',
+            'New Account ATM Withdrawal': '#ef4444'
+        }
+
+        # 0. KPI Metrics
+        kpi_query = """
+            SELECT
+                COUNT(*) AS total_alerts,
+                COUNT(DISTINCT acn) AS flagged_accounts
+            FROM alert_details
+            WHERE alert_timestamp >= NOW() - INTERVAL 7 DAY
+        """
+        df_kpi = pd.read_sql(kpi_query, con=engine)
+        total_alerts = int(df_kpi['total_alerts'].iloc[0]) if not df_kpi.empty else 0
+        flagged_accounts = int(df_kpi['flagged_accounts'].iloc[0]) if not df_kpi.empty else 0
+        flagged_pct = round((flagged_accounts / total_alerts) * 100, 1) if total_alerts > 0 else 0
+
+        # Active rules count
+        try:
+            df_rules = pd.read_sql("SELECT COUNT(*) AS active_rules FROM rules", con=engine)
+            active_rules = int(df_rules['active_rules'].iloc[0]) if not df_rules.empty else 3
+        except Exception:
+            active_rules = 3
+
+        # 1. Daily Bar Chart Data
         bar_query = """
-            SELECT 
+            SELECT
                 DATE(alert_timestamp) AS alert_date,
                 rule_name,
                 COUNT(*) AS alert_count
             FROM alert_details
             WHERE alert_timestamp >= NOW() - INTERVAL 7 DAY
             GROUP BY DATE(alert_timestamp), rule_name
-            ORDER BY alert_date ASC
         """
         df_bar = pd.read_sql(bar_query, con=engine)
 
-        # Generate Bar Chart Image in Memory
-        fig, ax = plt.subplots(figsize=(7, 4))
+        # Check for data gaps
         if not df_bar.empty:
             df_bar['alert_date'] = pd.to_datetime(df_bar['alert_date'])
+            days_with_data = df_bar['alert_date'].nunique()
+            if days_with_data < 3:
+                status_text = "Degraded"
+                status_color = "#f59e0b"
+                data_gap_warning = f"Data missing for {7 - days_with_data} of last 7 days"
+        else:
+            status_text = "No Data"
+            status_color = "#ef4444"
+            data_gap_warning = "No alerts in last 7 days"
+
+        # Generate Bar Chart
+        fig, ax = plt.subplots(figsize=(6.8, 4))
+        if not df_bar.empty:
             full_date_range = pd.date_range(end=datetime.now().date(), periods=7)
             df_pivot = df_bar.pivot_table(index='alert_date', columns='rule_name', values='alert_count', fill_value=0)
-            df_pivot = df_pivot.reindex(full_date_range, fill_value=0).reset_index()
-            df_melted = df_pivot.melt(id_vars='index', var_name='rule_name', value_name='alert_count')
+            df_pivot = df_pivot.reindex(full_date_range, fill_value=0)
+
+            df_melted = df_pivot.reset_index().melt(id_vars='index', var_name='rule_name', value_name='alert_count')
             df_melted.rename(columns={'index': 'alert_date'}, inplace=True)
             df_melted['alert_date'] = df_melted['alert_date'].dt.strftime('%m-%d')
 
-            sns.barplot(data=df_melted, x='alert_date', y='alert_count', hue='rule_name', palette=palette, ax=ax)
-            ax.set_title('Daily Alert Distribution (Last 7 Days)', fontsize=12, fontweight='bold', pad=15)
-            ax.set_xlabel('Date', fontsize=10)
-            ax.set_ylabel('Alert Count', fontsize=10)
-            ax.legend(title='Rule Name', bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+            unique_rules = df_melted['rule_name'].unique()
+            palette_list = [color_map.get(rule, '#64748b') for rule in unique_rules]
+
+            sns.barplot(data=df_melted, x='alert_date', y='alert_count', hue='rule_name',
+                        palette=palette_list, ax=ax, order=[d.strftime('%m-%d') for d in full_date_range])
+
+            for container in ax.containers:
+                ax.bar_label(container, labels=[int(v) if v > 0 else "" for v in container.datavalues],
+                             padding=3, fontsize=7, fontweight='bold')
+
+            max_val = df_melted['alert_count'].max()
+            ax.set_ylim(0, max(max_val * 1.15, 10))
+
+            ax.set_title('Daily Alert Distribution (Last 7 Days)', fontsize=11, fontweight='bold', pad=15, color='#1e293b')
+            ax.set_xlabel('Date', fontsize=9)
+            ax.set_ylabel('Alert Count', fontsize=9)
+            ax.legend(title='Rule Name', bbox_to_anchor=(1.02, 1), loc='upper left', fontsize=7, title_fontsize=8, frameon=False)
+            ax.tick_params(axis='x', rotation=0)
         else:
-            ax.text(0.5, 0.5, 'No alert data available', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-        
+            ax.text(0.5, 0.5, 'No alert data available', ha='center', va='center', transform=ax.transAxes, color='#64748b')
+            ax.set_title('Daily Alert Distribution (Last 7 Days)', fontsize=11, fontweight='bold', pad=15)
+
         plt.tight_layout()
         img_bar = io.BytesIO()
-        plt.savefig(img_bar, format='png', bbox_inches='tight', dpi=100)
+        plt.savefig(img_bar, format='png', bbox_inches='tight', dpi=130, facecolor='#ffffff')
         img_bar.seek(0)
         bar_url = base64.b64encode(img_bar.getvalue()).decode('utf8')
         plt.close(fig)
 
-        # 2. Query Donut Chart Data
+      # 2. Donut Chart Data (Maximized Size & Bottom Legend Layout)
         donut_query = """
-            SELECT 
-                rule_name,
-                COUNT(*) AS alert_count
+            SELECT rule_name, COUNT(*) AS alert_count
             FROM alert_details
             WHERE alert_timestamp >= NOW() - INTERVAL 7 DAY
             GROUP BY rule_name
         """
         df_donut = pd.read_sql(donut_query, con=engine)
 
-        # Generate Donut Chart Image in Memory
-        fig, ax = plt.subplots(figsize=(5, 4))
+        # Larger square figure to let the donut expand nicely
+        fig, ax = plt.subplots(figsize=(5, 4.5))
+        fig.patch.set_facecolor('#ffffff')
+        ax.set_facecolor('#ffffff')
+
         if not df_donut.empty:
+            donut_colors = [color_map.get(name, '#64748b') for name in df_donut['rule_name']]
+
+            # Draw larger pie/donut
             wedges, texts, autotexts = ax.pie(
-                df_donut['alert_count'], 
-                labels=df_donut['rule_name'], 
-                autopct='%1.1f%%', 
-                startangle=140, 
-                colors=palette,
-                wedgeprops=dict(width=0.4, edgecolor='w') # Creates the Donut hole
+                df_donut['alert_count'], labels=None, autopct='%1.0f%%', pctdistance=0.72,
+                startangle=140, colors=donut_colors, wedgeprops=dict(width=0.42, edgecolor='white', linewidth=2)
             )
-            plt.setp(autotexts, size=8, weight="bold")
-            plt.setp(texts, size=8)
-            ax.set_title('1-Week Alert Proportion', fontsize=12, fontweight='bold', pad=15)
+            plt.setp(autotexts, size=9, weight="bold", color="white")
+
+            # Perfectly centered title at the top
+            ax.set_title('1-Week Alert Proportion', fontsize=11, fontweight='bold', color='#1e293b', pad=10, loc='center')
+
+            # Move legend to the bottom, centered horizontally, stacked neatly
+            ax.legend(
+                wedges, df_donut['rule_name'], 
+                title="Rule Breakdown", 
+                loc="upper center", 
+                bbox_to_anchor=(0.5, -0.05), 
+                ncol=1, 
+                fontsize=7, 
+                title_fontsize=8, 
+                frameon=True,
+                facecolor='#f8fafc', 
+                edgecolor='#e2e8f0'
+            )
         else:
-            ax.text(0.5, 0.5, 'No alerts recorded', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+            ax.text(0.5, 0.5, 'No alerts recorded', ha='center', va='center', transform=ax.transAxes, color='#64748b')
+            ax.set_title('1-Week Alert Proportion', fontsize=11, fontweight='bold', color='#1e293b', pad=10, loc='center')
 
         plt.tight_layout()
         img_donut = io.BytesIO()
-        plt.savefig(img_donut, format='png', bbox_inches='tight', dpi=100)
+        plt.savefig(img_donut, format='png', bbox_inches='tight', dpi=150, facecolor='#ffffff')
         img_donut.seek(0)
         donut_url = base64.b64encode(img_donut.getvalue()).decode('utf8')
         plt.close(fig)
 
     except Exception as e:
-        bar_url = None
-        donut_url = None
+        print("Dashboard generation error:", e)
 
-    return render_template('dashboard.html', bar_url=bar_url, donut_url=donut_url)
+    return render_template('dashboard.html', bar_url=bar_url, donut_url=donut_url,
+                           total_alerts=total_alerts, flagged_accounts=flagged_accounts,
+                           active_rules=active_rules, flagged_pct=flagged_pct,
+                           status_text=status_text, status_color=status_color,
+                           data_gap_warning=data_gap_warning)
+
 
 @app.route('/configuration')
 def configuration():
