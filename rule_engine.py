@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_connection():
-    """Establishes and returns a connection to the MySQL database."""
+    """
+    Establishes and returns a live connection to the MySQL database (kedge_db) 
+    using environment variables for secure credential management.
+    """
     return mysql.connector.connect(
         host="localhost",
         user="root",
@@ -18,7 +21,13 @@ def get_db_connection():
     )
 
 def clear_previous_data():
-    """Resets transaction states for a fresh batch run while preserving alert history for the dashboard."""
+
+    """Resets transaction states for a fresh batch run while preserving alert history for the dashboard.""""""
+    Resets transaction processing states for a fresh batch run.
+    
+    Interacts with the **transaction_details** table to reset processing flags ('is_processed' = 'N') 
+    while preserving historical fraud alert records in the dashboard for auditing.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -32,7 +41,12 @@ def clear_previous_data():
         conn.close()
 
 def is_rule_engine_enabled():
-    """Checks the system settings table to see if the rule engine toggle is turned ON."""
+    """
+    Checks whether the automated rule engine toggle is currently active.
+    
+    Queries the **system_settings** table to verify if the 'rule_engine' setting status 
+    is set to 'ON'.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT status FROM system_settings WHERE setting_name = 'rule_engine'")
@@ -42,7 +56,11 @@ def is_rule_engine_enabled():
     return result and result[0] == 'ON'
 
 def get_remaining_count():
-    """Returns the count of unprocessed transactions remaining in the database."""
+    """Returns the count of unprocessed transactions remaining in the database.""""""
+    Returns the count of unprocessed transactions remaining in the queue.
+    
+    Queries the **transaction_details** table to count rows where 'is_processed' is marked as 'N'.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM transaction_details WHERE is_processed = 'N'")
@@ -52,7 +70,11 @@ def get_remaining_count():
     return count
 
 def get_rules_from_db():
-    """Fetches all active rules dynamically from the rules table."""
+    """
+    Fetches all active fraud detection rules dynamically from the database.
+    
+    Queries the **rules_table** to retrieve rule IDs, names, and underlying criteria data.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT rule_id, rule_name, rule_data FROM rules_table")
@@ -62,7 +84,11 @@ def get_rules_from_db():
     return rules
 
 def load_models_dynamically(rules):
-    """Loads machine learning pickle files dynamically using each rule's specific ID."""
+    """
+    Loads machine learning pickle model files dynamically using each rule's specific ID.
+    
+    Locates serialized model files from the designated directory path based on rule identifiers.
+    """
     models = {}
     for rule in rules:
         rule_id = rule['rule_id']
@@ -76,7 +102,11 @@ def load_models_dynamically(rules):
     return models
 
 def check_single_rule(txn, rule_id, model):
-    """Evaluates transaction features against a specific rule model and returns a boolean prediction."""
+    """
+    Evaluates transaction features against a specific rule model and returns a boolean prediction.
+    
+    Processes attributes like account age, narration text, transaction channels, and running totals.
+    """
     if not model: 
         return False
 
@@ -118,7 +148,13 @@ def check_single_rule(txn, rule_id, model):
         return False
 
 def process_batch():
-    """Fetches a batch of transactions with running totals, runs them through the rule models, and logs alerts."""
+    """
+    Fetches a batch of transactions with running totals, runs them through active rule models, 
+    and logs triggered alerts.
+    
+    Interacts with the **transaction_details**, **rules_table**, **alert_details**, 
+    and **system_settings** database tables.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
@@ -179,7 +215,10 @@ def process_batch():
     return True
 
 def run_scheduler_task():
-    """Wrapper function executed by the scheduler to check settings and process batches."""
+    """
+    Wrapper function executed periodically by the scheduler to check configuration settings 
+    and process transaction batches.
+    """
     if is_rule_engine_enabled():
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Rule Engine ON: Processing batch...")
         has_more = process_batch()

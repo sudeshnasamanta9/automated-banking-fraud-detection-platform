@@ -2,16 +2,33 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 import re
-import mysql.connector
+import io
+import base64
 import json
-from datetime import datetime
+import random
+import sys
+import subprocess
+from datetime import datetime, timedelta
+import mysql.connector
+import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')  # Necessary for non-GUI backend rendering in Flask
+import matplotlib.pyplot as plt
+import seaborn as sns
 import plotly.express as px
 import plotly.io as pio
-import numpy as np
 import kagglehub
 from sqlalchemy import create_engine
-from flask import Flask, render_template, request, redirect, flash, session, url_for
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    redirect, 
+    flash, 
+    session, 
+    url_for
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # IMPORT MODULAR PLUGINS
@@ -21,6 +38,10 @@ app = Flask(__name__)
 app.secret_key = "super_secret_meaningful_key"
 # Database Connection Helper
 def get_db_connection():
+    """
+    Establishes and returns a live connection to the MySQL database (kedge_db) 
+    using environment variables for secure credential management.
+    """
     return mysql.connector.connect(
         host="localhost",
         user="root",
@@ -31,6 +52,10 @@ def get_db_connection():
 # Custom template rendering filter to help interface payloads safely inside templates
 @app.template_filter('from_json_filter_or_similar_if_any')
 def from_json_filter(value):
+    """
+    Custom Jinja template filter to safely parse JSON strings into dictionary payloads 
+    inside HTML templates, preventing template rendering crashes.
+    """
     try:
         return json.loads(value)
     except:
@@ -40,6 +65,12 @@ def from_json_filter(value):
 app.register_blueprint(rules_bp)
 
 def validate_password_policy(password):
+    """
+    Validates user passwords against security compliance rules.
+    
+    Ensures length is between 4 and 12 characters, contains at least one uppercase letter, 
+    and includes at least one special character.
+    """
     if len(password) < 4 or len(password) > 12:
         return False, "Password must be between 4 and 12 characters long."
     if not any(char.isupper() for char in password):
@@ -50,6 +81,13 @@ def validate_password_policy(password):
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+    """
+    Handles user login authentication and new account registration.
+    
+    Processes form inputs, validates security policies for registration, hashes passwords 
+    securely using Werkzeug, matches credentials against the MySQL database during login, 
+    and manages user session tokens.
+    """
     if request.method == 'POST':
         action = request.form.get('action')
         username = request.form.get('username').strip()
@@ -102,28 +140,31 @@ from flask import session, redirect, url_for, flash
 
 @app.route('/logout', methods=['POST', 'GET'])
 def logout():
+    """
+    Handles user session termination and logout.
+    
+    Clears all active session tokens, flashes a success notification, 
+    and redirects the user back to the login authentication page.
+    """
     session.clear()  # Removes all session data
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login')) # Redirects to your login page
 
-import io
-import base64
-import matplotlib
-matplotlib.use('Agg') # Necessary for non-GUI backend in Flask
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sqlalchemy import create_engine
-import pandas as pd
-from datetime import datetime
-from flask import render_template, session, flash, redirect, url_for
-import os
-
 @app.route('/dashboard')
 def dashboard():
+    """
+    Renders the main administrative analytics dashboard.
+    
+    Performs security checks (session validation), queries MySQL database via SQLAlchemy 
+    for KPI metrics, daily alert trends, and proportional rule breakdowns, 
+    dynamically generates Matplotlib visualizations, and handles system health status.
+    """
+    
+    # Step 1: Secure session authentication check to prevent unauthorized access
     if 'user' not in session:
         flash("Please log in first.", "failure")
         return redirect(url_for('login'))
-
+    # Initialize default variables to prevent template rendering errors if data fetching fails
     bar_url = donut_url = None
     total_alerts = flagged_accounts = active_rules = flagged_pct = 0
     status_text = "Active"
@@ -288,6 +329,13 @@ def dashboard():
 
 @app.route('/configuration')
 def configuration():
+    """
+    Handles system configuration management.
+    
+    Validates user authentication, manages admin settings and rule thresholds 
+    (such as transaction limits or alert sensitivities), handles form submissions, 
+    and renders the configuration settings interface.
+    """
     if 'user' not in session:
         return redirect(url_for('login'))
     
@@ -315,11 +363,18 @@ def configuration():
     finally:
         cursor.close()
         conn.close()
-
+# Step 5: Render the configuration interface template
     return render_template('config.html', total_records=total_records, last_run_time=last_run_time)
 
 @app.route('/check-engine-status')
 def check_engine_status():
+    """
+    Checks the real-time execution status of the background rule engine worker.
+    
+    Validates user session, queries the database for the current setting status, 
+    and returns a JSON payload indicating whether processing has completed 
+    so the frontend UI can update automatically.
+    """
     if 'user' not in session:
         return {'status': 'unauthorized'}
         
@@ -350,6 +405,14 @@ DATASET_CONFIG = {
 
 @app.route('/toggle-data', methods=['POST'])
 def toggle_data():
+    """
+    Toggles the automated data-pulling pipeline on or off via user action.
+    
+    Validates user session, updates the toggled status in the session state, 
+    and if enabled, authenticates with Kaggle API, downloads the target financial dataset, 
+    parses CSV records, and maps synthetic transaction features (such as channels, 
+    narrations, and occupation-based turnovers) for rule-engine testing.
+    """
     if 'user' not in session:
         return redirect(url_for('login'))
 
@@ -473,6 +536,13 @@ engine_process = None
 
 @app.route('/toggle-rules', methods=['POST'])
 def toggle_rules():
+    """
+    Toggles the automated fraud detection rule engine on or off.
+    
+    Validates user authentication, updates the system state in the database, 
+    and dynamically starts or terminates the background worker process (`rule_engine.py`) 
+    using Python's subprocess module based on the requested configuration.
+    """
     global engine_process
     if 'user' not in session:
         return redirect(url_for('login'))
@@ -505,6 +575,14 @@ def toggle_rules():
     return render_template('config.html')
 @app.route('/report', methods=['GET', 'POST'])
 def report():
+    """
+    Handles report generation and audit log viewing with tabbed navigation.
+    
+    Validates user session, checks query parameters to determine active report tabs 
+    ('summary' for aggregated rule triggers or 'full' for detailed logs), processes 
+    optional date-range filters via POST requests, and queries the database via Pandas 
+    to render structured report records.
+    """
     if 'user' not in session:
         return redirect(url_for('login'))
     
@@ -554,6 +632,12 @@ def report():
 
 @app.route('/forgot-password')
 def forgot_password():
+    """
+    Simulates the password recovery and reset link dispatch process.
+    
+    Returns a clean, centered HTML notification indicating that a simulated 
+    password reset link has been successfully sent to the user's registered account.
+    """
     return "<h2 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Password reset link has been simulated and sent.</h2>"
 
 if __name__ == '__main__':
