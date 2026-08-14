@@ -20,6 +20,7 @@ import plotly.express as px
 import plotly.io as pio
 import kagglehub
 from sqlalchemy import create_engine
+from flask import Response
 from flask import (
     Flask, 
     render_template, 
@@ -629,6 +630,41 @@ def report():
                            full_alerts=full_alerts,
                            from_date=from_date,
                            to_date=to_date)
+@app.route('/download-report')
+def download_report():
+    """
+    Generates and downloads a CSV file of the current report tab (Summary or Full Logs).
+    
+    Validates user session, queries the database based on the active tab parameter, 
+    converts the records into CSV format using Pandas, and streams it as a file attachment.
+    """
+    if 'user' not in session:
+        return redirect(url_for('login'))
+        
+    tab = request.args.get('tab', 'summary')
+    engine = create_engine(f"mysql+mysqlconnector://root:{os.getenv('DB_PASSWORD')}@localhost:3306/kedge_db")
+    
+    try:
+        if tab == 'summary':
+            query = "SELECT rule_name, COUNT(*) AS trigger_count FROM alert_details GROUP BY rule_name"
+            df = pd.read_sql(query, con=engine)
+            filename = "alert_summary_report.csv"
+        else:
+            query = "SELECT * FROM alert_details ORDER BY alert_timestamp DESC"
+            df = pd.read_sql(query, con=engine)
+            filename = "full_audit_logs_report.csv"
+            
+        # Convert DataFrame to CSV string response
+        csv_data = df.to_csv(index=False)
+        
+        return Response(
+            csv_data,
+            mimetype="text/csv",
+            headers={"Content-disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        flash(f"Error generating download: {e}", "failure")
+        return redirect(url_for('report'))
 
 @app.route('/forgot-password')
 def forgot_password():

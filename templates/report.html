@@ -5,8 +5,21 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
 
 <div class="report-container">
-    <h1 class="report-title">Fraud Detection Reports</h1>
-    <p class="report-subtitle">View rule execution statistics, summary trends, and granular audit logs.</p>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+        <div>
+            <h1 class="report-title">Fraud Detection Reports</h1>
+            <p class="report-subtitle">View rule execution statistics, summary trends, and granular audit logs.</p>
+        </div>
+        
+        <!-- Download CSV Button -->
+        <a href="{{ url_for('download_report', tab=active_tab) }}" class="download-btn" style="background-color: #3b82f6; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 8px; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: background-color 0.2s;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+            </svg>
+            Download CSV
+        </a>
+    </div>
 
     <div class="report-layout">
         <!-- Sidebar Navigation with SVG Vector Icons -->
@@ -82,7 +95,9 @@
                             <tr>
                                 <th>Alert ID</th>
                                 <th>Account Number (ACN)</th>
+                                <th>Customer ID (CID)</th>
                                 <th>Triggered Rule</th>
+                                <th>Rule ID</th>
                                 <th>Timestamp</th>
                             </tr>
                         </thead>
@@ -92,13 +107,15 @@
                                 <tr>
                                     <td>{{ alert.alert_id }}</td>
                                     <td>{{ alert.acn }}</td>
+                                    <td>{{ alert.cid }}</td>
                                     <td style="font-weight: 500;">{{ alert.rule_name }}</td>
+                                    <td><code>{{ alert.rule_id }}</code></td>
                                     <td>{{ alert.alert_timestamp }}</td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="4" class="empty-state">No alerts recorded in system log.</td>
+                                    <td colspan="6" class="empty-state">No alerts recorded in system log.</td>
                                 </tr>
                             {% endif %}
                         </tbody>
